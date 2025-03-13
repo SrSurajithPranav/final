@@ -1,0 +1,87 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+}
+
+.result-container {
+    max-width: 900px;
+}
+
+.control-room {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.control-room-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.control-room-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.grid-item {
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 1000;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 20px 10px;
+    }
+
+    .title {
+        font-size: 1.8em;
+    }
+
+    .logo {
+        height: 40px;
+    }
+
+    .control-room-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .theme-toggle {
+        flex-direction: column;
+        align-items: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .title {
+        font-size: 1.5em;
+    }
+
+    .button-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .glass-card {
+        padding: 15px;
+    }
+
+    .input-field,
+    .btn {
+        font-size: 0.9em;
+    }
+}

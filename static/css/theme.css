@@ -1,0 +1,42 @@
+:root {
+    --primary-color: #00ffea;
+    --secondary-color: #ff00ff;
+    --background-color: #1b263b;
+    --text-color: #e0e0e0;
+    --card-background: rgba(255, 255, 255, 0.1);
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --glow-color: #00ffea;
+}
+
+body {
+    background: var(--background-color);
+    color: var(--text-color);
+}
+
+.title {
+    color: var(--primary-color);
+    text-shadow: 0 0 5px var(--glow-color);
+}
+
+.glass-card {
+    background: var(--card-background);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: #1b263b;
+}
+
+.btn-primary:hover {
+    background: #00ccbb;
+}
+
+.btn-secondary {
+    background: var(--secondary-color);
+    color: #1b263b;
+}
+
+.btn-secondary:hover {
+    background: #cc00cc;
+}

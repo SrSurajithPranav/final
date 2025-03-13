@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _("Analysis Result -") }} {{ result.username }}</title>
+    <link rel="icon" href="/static/assets/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link id="theme-style" rel="stylesheet" href="/static/css/theme.css">
+    <link id="mode-style" rel="stylesheet" href="/static/css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js" defer></script>
+    <script src="/static/js/main.js" defer></script>
+    <script src="/static/js/charts.js" defer></script>
+    <script src="/static/js/animations.js" defer></script>
+    <script>
+        const result = {{ result | tojson }};
+    </script>
+</head>
+<body class="cyberpunk-theme">
+    <div class="container result-container">
+        <header class="header" role="banner">
+            <img src="/static/assets/osint-logo.png" alt="OSINT Logo" class="logo">
+            <h1 class="title">{{ _("Analysis Result for @") }}{{ result.username }}</h1>
+        </header>
+        <main>
+            <div class="glass-card tilt-card">
+                <h2>{{ _("Prediction:") }} <span class="{{ result.prediction }}">{{ result.prediction | capitalize }}</span></h2>
+                <p>{{ _("Confidence:") }} {{ (result.confidence * 100) | round(2) }}%</p>
+                {% if result.profile_image %}
+                    <img src="{{ result.profile_image }}" alt="Profile Image" style="border-radius: 50%; width: 100px; height: 100px;">
+                {% endif %}
+                <p><strong>{{ _("Description:") }}</strong> {{ result.description }}</p>
+                <p><strong>{{ _("Account Created:") }}</strong> {{ result.created_at }}</p>
+                <p><strong>{{ _("Verified:") }}</strong> {{ result.verified }}</p>
+                <div class="confidence-circle">
+                    <svg width="150" height="150">
+                        <circle cx="75" cy="75" r="70" stroke="#333" stroke-width="10" fill="none"/>
+                        <circle class="progress-ring-circle" cx="75" cy="75" r="70" stroke="#00ffea" stroke-width="10" fill="none"
+                                stroke-dasharray="439.8" stroke-dashoffset="{{ 439.8 - (439.8 * result.confidence) }}"/>
+                    </svg>
+                    <div class="confidence-text">{{ (result.confidence * 100) | round(2) }}%</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="featureChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="behaviorChart"></canvas>
+                </div>
+                <div class="wordcloud-container">
+                    <img src="data:image/png;base64,{{ result.wordcloud }}" alt="Word Cloud">
+                </div>
+                <div class="sentiment-score">
+                    <p>{{ _("Sentiment Score (Compound):") }} {{ result.sentiment.compound | round(2) }}</p>
+                </div>
+                <div class="chart-container">
+                    <h3>{{ _("Sentiment Over Time") }}</h3>
+                    <canvas id="sentimentChart"></canvas>
+                </div>
+                <div class="button-group">
+                    <a href="{{ url_for('download', format='pdf', username=result.username, prediction=result.prediction, confidence=result.confidence) }}" class="btn btn-primary"><i class="fas fa-file-pdf"></i> {{ _("Download PDF") }}</a>
+                    <a href="{{ url_for('download', format='json', username=result.username, prediction=result.prediction, confidence=result.confidence) }}" class="btn btn-primary"><i class="fas fa-file-code"></i> {{ _("Download JSON") }}</a>
+                    <a href="{{ url_for('download', format='excel', username=result.username, prediction=result.prediction, confidence=result.confidence) }}" class="btn btn-primary"><i class="fas fa-file-excel"></i> {{ _("Download Excel") }}</a>
+                    <a href="{{ url_for('voice_summary', username=result.username, prediction=result.prediction, confidence=result.confidence) }}" class="btn btn-secondary"><i class="fas fa-volume-up"></i> {{ _("Voice Summary") }}</a>
+                </div>
+                <div class="button-group">
+                    <button onclick="startMonitoring('{{ result.username }}')" class="btn btn-primary">{{ _("Start Monitoring") }}</button>
+                    <button onclick="stopMonitoring('{{ result.username }}')" class="btn btn-secondary">{{ _("Stop Monitoring") }}</button>
+                </div>
+                <div class="button-group">
+                    <button onclick="submitFeedback(true)" class="btn btn-primary">{{ _("Yes, it's") }} {{ result.prediction }}</button>
+                    <button onclick="submitFeedback(false)" class="btn btn-secondary">{{ _("No, it's not") }} {{ result.prediction }}</button>
+                </div>
+                <div class="glass-card">
+                    <h3>{{ _("Anomaly Detection") }}</h3>
+                    <p>{{ _("Result:") }} <span class="{{ 'fake' if result.anomaly == 'Anomaly Detected' else 'genuine' }}">{{ result.anomaly }}</span></p>
+                    <p>{{ _("Anomaly Score:") }} {{ result.anomaly_score | round(2) }}</p>
+                </div>
+                <div class="glass-card">
+                    <h2>{{ _("Share This Analysis") }}</h2>
+                    <form action="/share" method="POST">
+                        <input type="hidden" name="username" value="{{ result.username }}">
+                        <input type="hidden" name="prediction" value="{{ result.prediction }}">
+                        <input type="hidden" name="confidence" value="{{ result.confidence }}">
+                        <textarea name="notes" class="input-field" placeholder="{{ _("Add your notes...") }}" required></textarea>
+                        <button type="submit" class="btn btn-primary">{{ _("Share Analysis") }}</button>
+                    </form>
+                </div>
+            </div>
+            <a href="/" class="btn btn-primary"><i class="fas fa-arrow-left"></i> {{ _("Back to Home") }}</a>
+        </main>
+    </div>
+    <script>
+        function submitFeedback(isFake) {
+            fetch('/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: result.username, is_fake: isFake })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (data.status === 'success') alert('Badge progress updated!');
+            })
+            .catch(error => alert('Error: ' + error));
+        }
+
+        function startMonitoring(username) {
+            fetch(`/monitor/${username}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => alert(data.message))
+                .catch(error => alert('Error: ' + error));
+        }
+
+        function stopMonitoring(username) {
+            fetch(`/stop_monitor/${username}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => alert(data.message))
+                .catch(error => alert('Error: ' + error));
+        }
+    </script>
+</body>
+</html>

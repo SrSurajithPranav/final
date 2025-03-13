@@ -1,0 +1,52 @@
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #ff6f61;
+    --background-color: #f4f4f9;
+    --text-color: #333;
+    --card-background: rgba(255, 255, 255, 0.9);
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --glow-color: #007bff;
+}
+
+body.light-mode {
+    background: var(--background-color);
+    color: var(--text-color);
+}
+
+.light-mode .glass-card {
+    background: var(--card-background);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .title {
+    color: var(--primary-color);
+    text-shadow: none;
+}
+
+.light-mode .btn-primary {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.light-mode .btn-primary:hover {
+    background: #0056b3;
+}
+
+.light-mode .btn-secondary {
+    background: var(--secondary-color);
+    color: #fff;
+}
+
+.light-mode .btn-secondary:hover {
+    background: #ff4d3f;
+}
+
+.light-mode .fake {
+    color: #dc3545;
+    text-shadow: none;
+}
+
+.light-mode .genuine {
+    color: #28a745;
+    text-shadow: none;
+}

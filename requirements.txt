@@ -1,0 +1,17 @@
+flask
+flask-caching
+nltk
+pandas
+scikit-learn
+requests
+gunicorn
+reportlab
+gtts
+flask-sqlalchemy
+flask-login
+wordcloud==1.8.2.2
+apscheduler
+flask-mail
+pyod
+flask-babel
+openpyxl

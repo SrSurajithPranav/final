@@ -1,0 +1,43 @@
+body.cyberpunk-theme {
+    --primary-color: #00ffea;
+    --secondary-color: #ff00ff;
+    --background-color: #1b263b;
+    --text-color: #e0e0e0;
+    --card-background: rgba(255, 255, 255, 0.1);
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --glow-color: #00ffea;
+}
+
+.background-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.5;
+    z-index: -1;
+}
+
+.glass-card {
+    box-shadow: 0 0 15px var(--glow-color);
+}
+
+.input-field {
+    border: 1px solid var(--primary-color);
+    transition: box-shadow 0.3s ease;
+}
+
+.input-field:focus {
+    box-shadow: 0 0 10px var(--glow-color);
+}
+
+.fake {
+    color: #ff4d4d;
+    text-shadow: 0 0 5px #ff4d4d;
+}
+
+.genuine {
+    color: #00ff00;
+    text-shadow: 0 0 5px #00ff00;
+}

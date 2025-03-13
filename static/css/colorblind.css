@@ -1,0 +1,36 @@
+body {
+    --primary-color: #66ccff;
+    --secondary-color: #ffcc66;
+    --glow-color: #66ccff;
+}
+
+.fake {
+    color: #ff6666;
+    text-shadow: none;
+}
+
+.genuine {
+    color: #66cc66;
+    text-shadow: none;
+}
+
+.btn-primary {
+    background: #66ccff;
+}
+
+.btn-primary:hover {
+    background: #4da8ff;
+}
+
+.btn-secondary {
+    background: #ffcc66;
+}
+
+.btn-secondary:hover {
+    background: #ffaa33;
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid #666;
+}

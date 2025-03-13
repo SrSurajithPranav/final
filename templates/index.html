@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _("OSINT Fake Account Detector") }}</title>
+    <link rel="icon" href="/static/assets/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link id="theme-style" rel="stylesheet" href="/static/css/theme.css">
+    <link id="mode-style" rel="stylesheet" href="/static/css/theme.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intro.js@4.0.0/minified/introjs.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/TextPlugin.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/intro.js@4.0.0/minified/intro.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/jsm/controls/OrbitControls.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ScrollMagic/2.0.8/ScrollMagic.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ScrollMagic/2.0.8/plugins/animation.gsap.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.7.0/dist/vanilla-tilt.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js" defer></script>
+    <script src="/static/js/main.js" defer></script>
+    <script src="/static/js/animations.js" defer></script>
+    <script src="/static/js/particles.js" defer></script>
+    <script src="/static/js/assistant.js" defer></script>
+    <script src="/static/js/sound.js" defer></script>
+    <script src="/static/js/game.js" defer></script>
+    <script src="/static/js/matrix.js" defer></script>
+</head>
+<body>
+    <!-- <video autoplay muted loop class="background-video">
+        <source src="/static/assets/matrix-bg.mp4" type="video/mp4">
+    </video> -->
+    <div id="particles-js" class="particle-bg"></div>
+    <div class="theme-toggle" role="toolbar">
+        <button id="themeSwitch" class="btn btn-secondary" aria-label="{{ _("Toggle theme") }}"><i class="fas fa-adjust"></i> {{ _("Toggle Theme") }}</button>
+        <button id="modeSwitch" class="btn btn-secondary" aria-label="{{ _("Toggle mode") }}"><i class="fas fa-sun"></i> {{ _("Toggle Mode") }}</button>
+        <select id="languageSwitch" class="input-field" aria-label="{{ _("Select language") }}" onchange="changeLanguage(this.value)">
+            <option value="en" {% if get_locale() == 'en' %}selected{% endif %}>{{ _("English") }}</option>
+            <option value="es" {% if get_locale() == 'es' %}selected{% endif %}>{{ _("Español") }}</option>
+            <option value="fr" {% if get_locale() == 'fr' %}selected{% endif %}>{{ _("Français") }}</option>
+        </select>
+    </div>
+    <header class="header" role="banner">
+        <img src="/static/assets/osint-logo.png" alt="OSINT Logo" class="logo">
+        <h1 class="title">{{ _("OSINT Fake Account Detector") }}</h1>
+    </header>
+    <main class="container">
+        <div class="glass-card tilt-card">
+            <h2>{{ _("Analyze a Target") }}</h2>
+            <form id="analyzeForm" action="/analyze" method="POST">
+                <div class="form-group">
+                    <label for="username">{{ _("Target Username (e.g., @example):") }}</label>
+                    <input type="text" id="username" name="username" class="input-field" placeholder="@username" aria-describedby="usernameHelp">
+                    <small id="usernameHelp" class="form-text">{{ _("Enter the username starting with @") }}</small>
+                </div>
+                <div class="form-group">
+                    <label for="staticUserSelect">{{ _("Or Select a Known Target:") }}</label>
+                    <select id="staticUserSelect" class="input-field" aria-label="{{ _("Select a known target") }}">
+                        <option value="">{{ _("-- Select Target --") }}</option>
+                        {% for user in static_users %}
+                            <option value="{{ user }}">{{ user }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary analyze-btn">{{ _("Analyze Fake Account") }}</button>
+                    <button type="button" id="analyzeStatic" class="btn btn-secondary">{{ _("Analyze Selected Target") }}</button>
+                </div>
+            </form>
+        </div>
+        <nav class="button-group" role="navigation">
+            <a href="/live_dashboard" class="btn btn-primary"><i class="fas fa-tachometer-alt"></i> {{ _("Live Dashboard") }}</a>
+            <a href="/control_room" class="btn btn-primary"><i class="fas fa-cogs"></i> {{ _("Control Room") }}</a>
+            <a href="/guide" class="btn btn-primary"><i class="fas fa-book"></i> {{ _("Guide") }}</a>
+            <a href="/shared_reports" class="btn btn-primary"><i class="fas fa-users"></i> {{ _("Shared Reports") }}</a>
+            <a href="/leaderboard" class="btn btn-primary"><i class="fas fa-trophy"></i> {{ _("Leaderboard") }}</a>
+        </nav>
+        <div id="game-area" class="mini-game">
+            <h3>{{ _("Bot Whacker - Score:") }} <span id="score">0</span></h3>
+        </div>
+    </main>
+    <div id="loader" class="loader hidden">
+        <div class="spinner"></div>
+        <p>{{ _("Analyzing...") }}</p>
+    </div>
+    <div id="assistant" class="assistant">
+        <p>OSINT Cyber Agent: {{ _("Loading tips...") }}</p>
+    </div>
+    <script>
+        function changeLanguage(lang) {
+            document.cookie = `locale=${lang}; path=/`;
+            location.reload();
+        }
+
+        if (localStorage.getItem('tutorialCompleted')) return;
+
+        introJs().setOptions({
+            steps: [
+                { element: '#username', intro: '{{ _("Enter a username here to analyze.") }}' },
+                { element: '#staticUserSelect', intro: '{{ _("Or select a known target from this list.") }}' },
+                { element: '.button-group', intro: '{{ _("Click these buttons to explore more features.") }}' }
+            ],
+            showProgress: true,
+            doneLabel: '{{ _("Finish") }}'
+        }).oncomplete(() => {
+            localStorage.setItem('tutorialCompleted', 'true');
+        }).start();
+    </script>
+</body>
+</html>

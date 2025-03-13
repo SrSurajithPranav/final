@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _("Control Room") }}</title>
+    <link rel="icon" href="/static/assets/favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link id="theme-style" rel="stylesheet" href="/static/css/theme.css">
+    <link id="mode-style" rel="stylesheet" href="/static/css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js" defer></script>
+    <script src="/static/js/main.js" defer></script>
+    <script src="/static/js/animations.js" defer></script>
+    <script src="/static/js/network.js" defer></script>
+    <script>
+        const liveData = {{ live_data | tojson }};
+    </script>
+</head>
+<body class="cyberpunk-theme">
+    <div class="container">
+        <header class="header" role="banner">
+            <img src="/static/assets/osint-logo.png" alt="OSINT Logo" class="logo">
+            <h1 class="title">{{ _("Control Room") }}</h1>
+        </header>
+        <div class="control-room">
+            <div class="control-room-header">
+                <h2>{{ _("Network Analysis") }}</h2>
+            </div>
+            <div class="control-room-grid">
+                <div class="grid-item network-graph" id="networkGraph"></div>
+            </div>
+        </div>
+        <a href="/" class="btn btn-primary"><i class="fas fa-arrow-left"></i> {{ _("Back to Home") }}</a>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof NetworkGraph !== 'undefined') {
+                new NetworkGraph('networkGraph', liveData.network_data);
+            }
+        });
+    </script>
+</body>
+</html>
