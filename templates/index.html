@@ -1,13 +1,28 @@
-{% extends 'base.html' %}
-
-{% block content %}
-    <h1 class="text-center mb-4">Analyze a Twitter Account</h1>
-    <form method="POST" class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="input-group mb-3">
-                <input type="text" name="username" class="form-control" placeholder="Enter Twitter username (e.g., @username)" required>
-                <button type="submit" class="btn btn-primary">Analyze</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Account Analyzer</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 analyzer-container">
+                <h2>Twitter Account Analyzer</h2>
+                <form action="/analyze" method="POST">
+                    <div class="form-group">
+                        <label for="username">Enter Twitter Username:</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="@username" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Analyze Account</button>
+                    <a href="/plot" class="btn btn-secondary btn-block">View Caching Impact</a>
+                </form>
             </div>
         </div>
-    </form>
-{% endblock %}
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
