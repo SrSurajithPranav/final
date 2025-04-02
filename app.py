@@ -1,230 +1,214 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
-import tweepy
+from flask import Flask, render_template, request
 import os
-from io import BytesIO
-import base64
-from collections import Counter
-from wordcloud import WordCloud
+import requests
+import pandas as pd
+from pymongo import MongoClient
+from datetime import datetime, timedelta
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
-import shap
-from textblob import TextBlob
-import folium
-from folium.plugins import HeatMap
-import json
-import io
+import numpy as np
 
 app = Flask(__name__)
 
-# Twitter API setup with four bearer tokens for load balancing
+# MongoDB Connection
+MONGO_URI = "mongodb+srv://aayushiagarwal580:9Yz0jtzzc793TBmK@cluster0.odpct.mongodb.net/?retryWrites=true&w=majority"  # Replace with your MongoDB URI
+client = MongoClient(MONGO_URI)
+db = client["fake2"]
+collection = db["twitter_users"]
+
+# Twitter API Configuration
 BEARER_TOKENS = [
-    os.getenv('TWITTER_BEARER_TOKEN_1', 'YOUR_TOKEN_1_HERE'),
-    os.getenv('TWITTER_BEARER_TOKEN_2', 'YOUR_TOKEN_2_HERE'),
-    os.getenv('TWITTER_BEARER_TOKEN_3', 'YOUR_TOKEN_3_HERE'),
-    os.getenv('TWITTER_BEARER_TOKEN_4', 'YOUR_TOKEN_4_HERE')
+    os.getenv("BEARER_TOKEN_1", "AAAAAAAAAAAAAAAAAAAAAANoxAEAAAAARIratdNtUpsn7Gxk5YZHrDgXVmI%3DhdjZY09cKTCe7xAioFXli8PM2qq68rtGjVcqFwYAvGjlnAARsY"),
+    os.getenv("BEARER_TOKEN_2", "AAAAAAAAAAAAAAAAAAAAALOhywEAAAAAW8Oi86wzl4ft4tnhzRlyZ3%2FFGF8%3D4ItRbnSYTeK9jcWopAugYeMcqfAOypNi5gBERQ4wBjY4aq9phL"),
+    os.getenv("BEARER_TOKEN_3", "AAAAAAAAAAAAAAAAAAAAACzpygEAAAAA8k18d8ZP23NtWodqYI5x6mwfS58%3DDLK7sv0qrqEu7u7bovNoHegux5EkHiVhKqp41jPV1mKzYRcQMm"),
+    os.getenv("BEARER_TOKEN_4", "AAAAAAAAAAAAAAAAAAAAACg7zAEAAAAABBikdwYlorE2FeNpNqrkT8uV1fk%3DsxxU1YZAYwO0G56tjTPSElgal0CEy0HF3zJ4a5jtpmTdRyO4h7")
 ]
-current_token_index = 0
+API_ENDPOINT = "https://api.twitter.com/2/users/by/username/"
+REQUIRED_FEATURES = ['followers_count', 'friends_count', 'statuses_count', 'listed_count']
 
-def get_twitter_client():
-    global current_token_index
-    token = BEARER_TOKENS[current_token_index]
-    current_token_index = (current_token_index + 1) % len(BEARER_TOKENS)
-    return tweepy.Client(bearer_token=token)
-
-class Analyzer:
+class TwitterAccountAnalyzer:
     def __init__(self):
+        self.models = {}
+        self.scaler = MinMaxScaler()
         self.static_data = self.load_static_data()
-        self.model = self.train_model()
-        self.explainer = shap.TreeExplainer(self.model)
+        self.initialize_models()
+        self.train_models()
+
+    def initialize_models(self):
+        self.models['rf'] = RandomForestClassifier(n_estimators=150, random_state=42)
+        self.models['gb'] = GradientBoostingClassifier(n_estimators=150, random_state=42)
+        self.models['lr'] = LogisticRegression(max_iter=1000)
+        self.models['voting'] = VotingClassifier(
+            estimators=[('rf', self.models['rf']), ('gb', self.models['gb']), ('lr', self.models['lr'])],
+            voting='soft'
+        )
+
+    def train_models(self):
+        X = self.static_data[REQUIRED_FEATURES]
+        y = self.static_data['label']
+        X_scaled = self.scaler.fit_transform(X)
+        for name, model in self.models.items():
+            if name != 'voting':
+                model.fit(X_scaled, y)
+        self.models['voting'].fit(X_scaled, y)
 
     def load_static_data(self):
-        users = pd.read_csv('static_data/users.csv')
-        fusers = pd.read_csv('static_data/fusers.csv')
-        users['label'] = 0
-        fusers['label'] = 1
-        data = pd.concat([users, fusers], ignore_index=True)
-        return data
+        users_df = pd.read_csv('users.csv')
+        fusers_df = pd.read_csv('fusers.csv')
+        users_df['label'] = 0
+        fusers_df['label'] = 1
+        return pd.concat([users_df, fusers_df], ignore_index=True)
 
-    def train_model(self):
-        X = self.static_data[['followers_count', 'friends_count', 'statuses_count', 'listed_count']]
-        y = self.static_data['label']
-        param_grid = {
-            'n_estimators': [100, 200],
-            'max_depth': [10, 20, None],
-            'min_samples_split': [2, 5]
-        }
-        model = RandomForestClassifier(random_state=42)
-        grid_search = GridSearchCV(model, param_grid, cv=5, scoring='accuracy')
-        grid_search.fit(X, y)
-        print("Best parameters:", grid_search.best_params_)
-        print("Classification Report:\n", classification_report(y, grid_search.predict(X)))
-        return grid_search.best_estimator_
+    def predict(self, user_df):
+        X = user_df[REQUIRED_FEATURES]
+        X_scaled = self.scaler.transform(X)
+        prediction = self.models['voting'].predict(X_scaled)
+        probability = self.models['voting'].predict_proba(X_scaled)[0]
+        return prediction, probability
 
-    def analyze_user(self, username):
+analyzer = TwitterAccountAnalyzer()
+
+def get_twitter_data(username):
+    params = {"user.fields": "public_metrics,created_at,description,profile_image_url"}
+    for token in BEARER_TOKENS:
+        headers = {"Authorization": f"Bearer {token}"}
         try:
-            client = get_twitter_client()
-            user = client.get_user(username=username.replace('@', ''), user_fields=['public_metrics', 'description', 'location', 'verified'])
-            if not user.data:
-                return None
+            response = requests.get(f"{API_ENDPOINT}{username}", headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException:
+            continue  # Try next token
+    return None  # If all tokens fail
 
-            profile = {
-                'followers_count': user.data.public_metrics['followers_count'],
-                'friends_count': user.data.public_metrics['following_count'],
-                'statuses_count': user.data.public_metrics['tweet_count'],
-                'listed_count': user.data.public_metrics['listed_count'],
-                'description': user.data.description or 'No description',
-                'location': user.data.location or None,
-                'verified': user.data.verified
-            }
+def parse_twitter_data(user_data):
+    metrics = user_data['data']['public_metrics']
+    return {
+        'followers_count': metrics['followers_count'],
+        'friends_count': metrics['following_count'],
+        'statuses_count': metrics['tweet_count'],
+        'listed_count': metrics['listed_count'],
+        'created_at': user_data['data'].get('created_at', 'N/A'),
+        'description': user_data['data'].get('description', ''),
+        'profile_image_url': user_data['data'].get('profile_image_url', '')
+    }
 
-            X_new = pd.DataFrame([profile])[['followers_count', 'friends_count', 'statuses_count', 'listed_count']]
-            prediction = self.model.predict(X_new)[0]
-            confidence = self.model.predict_proba(X_new)[0][prediction]
+@app.template_filter('format_date')
+def format_date_filter(date_str):
+    if not date_str or date_str == 'N/A':
+        return 'N/A'
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+        return date_obj.strftime('%b %d, %Y')
+    except ValueError:
+        return date_str
 
-            # 1. Confidence Score Visualization (Heat Map)
-            confidence_heatmap = BytesIO()
-            plt.figure(figsize=(2, 2))
-            sns.heatmap([[confidence]], cmap='RdYlGn', annot=True, fmt='.2f', cbar=False)
-            plt.axis('off')
-            plt.savefig(confidence_heatmap, format='png', bbox_inches='tight')
-            confidence_heatmap.seek(0)
-            confidence_heatmap_base64 = base64.b64encode(confidence_heatmap.getvalue()).decode('utf-8')
-            plt.close()
+@app.template_filter('comma')
+def comma_filter(value):
+    return f"{int(value):,}"
 
-            # 2. Feature Contribution Breakdown (SHAP Plot)
-            shap_values = self.explainer.shap_values(X_new)
-            shap_plot = BytesIO()
-            plt.figure(figsize=(6, 4))
-            shap.summary_plot(shap_values, X_new, plot_type='bar', show=False)
-            plt.savefig(shap_plot, format='png', bbox_inches='tight')
-            shap_plot.seek(0)
-            shap_plot_base64 = base64.b64encode(shap_plot.getvalue()).decode('utf-8')
-            plt.close()
-
-            # Waterfall Chart (using Plotly)
-            shap_values_single = shap_values[prediction][0]
-            features = ['followers_count', 'friends_count', 'statuses_count', 'listed_count']
-            waterfall_data = {
-                'Feature': features,
-                'Contribution': shap_values_single
-            }
-            fig = px.bar(waterfall_data, x='Contribution', y='Feature', orientation='h', title='Feature Contribution to Prediction')
-            waterfall_plot = fig.to_json()
-
-            # 3. Similar Account Analysis (Cluster Graph - Simplified)
-            distances = np.linalg.norm(self.static_data[features].values - X_new.values, axis=1)
-            similar_indices = distances.argsort()[:3]
-            similar_accounts = self.static_data.iloc[similar_indices]
-            cluster_data = {
-                'nodes': [{'id': username, 'group': 'target'}] + 
-                        [{'id': f"similar_{i}", 'group': 'similar'} for i in range(len(similar_indices))],
-                'links': [{'source': username, 'target': f"similar_{i}", 'value': 1} for i in range(len(similar_indices))]
-            }
-
-            # 4. Sentiment Analysis (Pie Chart)
-            sentiment = TextBlob(profile['description']).sentiment
-            polarity = sentiment.polarity
-            sentiment_labels = ['Positive', 'Neutral', 'Negative']
-            sentiment_values = [
-                max(0, polarity),  # Positive
-                max(0, 1 - abs(polarity)),  # Neutral
-                max(0, -polarity)  # Negative
-            ]
-            sentiment_data = {'labels': sentiment_labels, 'values': sentiment_values}
-
-            # Word Cloud
-            wordcloud_data = Counter(profile['description'].split()).most_common(10)
-            wordcloud = WordCloud(width=400, height=200, background_color='black').generate_from_frequencies(dict(wordcloud_data))
-            wordcloud_image = BytesIO()
-            wordcloud.to_image().save(wordcloud_image, format='PNG')
-            wordcloud_base64 = base64.b64encode(wordcloud_image.getvalue()).decode('utf-8')
-
-            # 5. Anomaly Detection (Distribution Plot)
-            anomaly_scores = np.abs(X_new.values - self.static_data[features].mean().values) / self.static_data[features].std().values
-            anomaly_score = anomaly_scores.mean()
-            anomaly_plot = BytesIO()
-            plt.figure(figsize=(6, 4))
-            sns.histplot(anomaly_scores.flatten(), kde=True, color='orange')
-            plt.axvline(anomaly_score, color='red', linestyle='--', label=f'Account Anomaly Score: {anomaly_score:.2f}')
-            plt.legend()
-            plt.title('Anomaly Score Distribution')
-            plt.savefig(anomaly_plot, format='png', bbox_inches='tight')
-            anomaly_plot.seek(0)
-            anomaly_plot_base64 = base64.b64encode(anomaly_plot.getvalue()).decode('utf-8')
-            plt.close()
-
-            # Timeline Chart (Placeholder)
-            timeline_data = {'dates': ['2023-01', '2023-02', '2023-03'], 'scores': [0.5, 0.6, anomaly_score]}
-
-            # 6. Geolocation Visualization (Interactive Map)
-            map_html = None
-            if profile['location']:
-                m = folium.Map(location=[0, 0], zoom_start=2)
-                folium.Marker([0, 0], popup=profile['location']).add_to(m)  # Mock coordinates
-                map_html = m._repr_html_()
-
-            # Heatmap (Placeholder)
-            heatmap_data = [[0, 0, 1]]  # Mock data
-
-            # 7. Network Analysis (Social Graph - Simplified)
-            network_data = {
-                'nodes': [{'id': username, 'group': 'target'}] + 
-                        [{'id': f"friend_{i}", 'group': 'friend'} for i in range(min(3, profile['friends_count']))],
-                'links': [{'source': username, 'target': f"friend_{i}", 'value': 1} for i in range(min(3, profile['friends_count']))]
-            }
-
-            # 8. Profile Image Analysis (Placeholder)
-            profile_image_analysis = "Profile image analysis not implemented (requires image processing)."
-
-            # 9. Verification and Trust Indicator
-            trust_score = confidence * 0.8 + (0.2 if profile['verified'] else 0)
-
-            return {
-                'username': username,
-                'prediction': 'fake' if prediction == 1 else 'genuine',
-                'confidence': confidence,
-                'confidence_heatmap': confidence_heatmap_base64,
-                'shap_plot': shap_plot_base64,
-                'waterfall_plot': waterfall_plot,
-                'cluster_data': cluster_data,
-                'sentiment_data': sentiment_data,
-                'wordcloud': wordcloud_base64,
-                'anomaly_plot': anomaly_plot_base64,
-                'timeline_data': timeline_data,
-                'map_html': map_html,
-                'heatmap_data': heatmap_data,
-                'network_data': network_data,
-                'profile_image_analysis': profile_image_analysis,
-                'verified': profile['verified'],
-                'trust_score': trust_score,
-                'profile': profile
-            }
-        except Exception as e:
-            print(f"Error analyzing {username}: {e}")
-            return None
-
-analyzer = Analyzer()
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        if username:
-            return redirect(url_for('result', username=username))
+@app.route('/')
+def home():
     return render_template('index.html')
 
-@app.route('/result/<username>')
-def result(username):
-    result = analyzer.analyze_user(username)
-    if not result:
-        return "User not found or API error.", 404
-    return render_template('result.html', result=result)
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    username = request.form['username'].strip().lstrip('@')
+    if not username:
+        return render_template('error.html', error="Please enter a username"), 400
+
+    try:
+        user_data = collection.find_one({"username": username})
+        if user_data:
+            last_fetched_time = datetime.strptime(user_data['timestamp'], '%Y-%m-%d %H:%M:%S')
+            time_diff = datetime.now() - last_fetched_time
+            if time_diff < timedelta(hours=3):
+                prediction, probability = analyzer.predict(pd.DataFrame([user_data]))
+                confidence = round(max(probability) * 100, 1)
+                return render_template('result.html', result={
+                    'username': username,
+                    'prediction': 'fake' if prediction[0] == 1 else 'genuine',
+                    'confidence': confidence,
+                    'features': user_data,
+                    'account_data': {
+                        'created_at': user_data['created_at'],
+                        'description': user_data['description'],
+                        'profile_image_url': user_data['profile_image_url'],
+                        'source': 'MongoDB Cache'
+                    }
+                })
+
+        # Fetch from API if data is outdated or not found
+        twitter_data = get_twitter_data(username)
+        if twitter_data and 'data' in twitter_data:
+            parsed_data = parse_twitter_data(twitter_data)
+            parsed_data['username'] = username
+            parsed_data['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            collection.update_one({"username": username}, {"$set": parsed_data}, upsert=True)
+            prediction, probability = analyzer.predict(pd.DataFrame([parsed_data]))
+            confidence = round(max(probability) * 100, 1)
+            return render_template('result.html', result={
+                'username': username,
+                'prediction': 'fake' if prediction[0] == 1 else 'genuine',
+                'confidence': confidence,
+                'features': parsed_data,
+                'account_data': {
+                    'created_at': parsed_data['created_at'],
+                    'description': parsed_data['description'],
+                    'profile_image_url': parsed_data['profile_image_url'],
+                    'source': 'Twitter API'
+                }
+            })
+
+        return render_template('error.html', error="User not found"), 404
+
+    except Exception as e:
+        return render_template('error.html', error=str(e)), 500
+
+# image.py functionality integrated here
+@app.route('/plot')
+def plot_data():
+    # Categories for comparison
+    categories = [
+        "API Call Efficiency", "Performance", "Data Persistence",
+        "Error Handling", "Model Input Consistency", "Scalability"
+    ]
+
+    # Assigning scores (lower is worse, higher is better)
+    without_mongodb = [2, 2, 1, 2, 2, 2]  # Without MongoDB caching
+    with_mongodb = [5, 5, 5, 5, 5, 5]  # With MongoDB caching
+
+    # Set the bar width
+    bar_width = 0.35
+    index = np.arange(len(categories))
+
+    # Create the bar chart
+    fig, ax = plt.subplots(figsize=(12, 8))
+    bars1 = ax.bar(index - bar_width / 2, without_mongodb, bar_width, label="Without MongoDB", color='red', alpha=0.7)
+    bars2 = ax.bar(index + bar_width / 2, with_mongodb, bar_width, label="With MongoDB", color='green', alpha=0.7)
+
+    # Formatting the chart
+    ax.set_xlabel("Aspects", fontsize=12)
+    ax.set_ylabel("Efficiency Score (Higher is Better)", fontsize=12)
+    ax.set_title("Impact of MongoDB Caching on Model Performance", fontsize=16)
+    ax.set_xticks(index)
+    ax.set_xticklabels(categories, rotation=30, ha="right", fontsize=10)
+    ax.legend(fontsize=10)
+
+    # Save the plot to a BytesIO object
+    import io
+    img = io.BytesIO()
+    plt.tight_layout()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plt.close()
+
+    # Encode the image to base64
+    import base64
+    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
+
+    return render_template('plot.html', plot_url=plot_url)
 
 if __name__ == '__main__':
     app.run(debug=True)
